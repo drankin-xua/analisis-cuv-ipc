@@ -1,3 +1,4 @@
+
 # ============================================================
 # REGRESION IPC ELECTRICIDAD ~ COSTO VARIABLE UNITARIO (CUV)
 # Análisis por promedios nacionales y por estratos
@@ -458,6 +459,90 @@ for (nombre in names(estratos_vars)) {
 
 
 # ============================================================
+# PARTE IV: REGRESIONES INDIVIDUALES POR ESTRATO — LOG-LOG
+# ============================================================
+cat("\n========================================\n")
+cat("REGRESIONES INDIVIDUALES POR ESTRATO — LOG-LOG\n")
+cat("Interpretación: coeficiente = elasticidad (% cambio IPC / % cambio CUV)\n")
+cat("========================================\n")
+
+# Variables log de cada estrato
+datos_est <- datos_est %>%
+  mutate(
+    ln_E1     = log(ESTRATO_1),
+    ln_E2     = log(ESTRATO_2),
+    ln_E3     = log(ESTRATO_3),
+    ln_E4     = log(ESTRATO_4),
+    ln_E5y6   = log(ESTRATO_5y6),
+    ln_E1_lag1   = lag(log(ESTRATO_1),   1),
+    ln_E2_lag1   = lag(log(ESTRATO_2),   1),
+    ln_E3_lag1   = lag(log(ESTRATO_3),   1),
+    ln_E4_lag1   = lag(log(ESTRATO_4),   1),
+    ln_E5y6_lag1 = lag(log(ESTRATO_5y6), 1)
+  )
+
+estratos_vars_ll <- list(
+  E1   = list(cont = "ln_E1",   lag = "ln_E1_lag1"),
+  E2   = list(cont = "ln_E2",   lag = "ln_E2_lag1"),
+  E3   = list(cont = "ln_E3",   lag = "ln_E3_lag1"),
+  E4   = list(cont = "ln_E4",   lag = "ln_E4_lag1"),
+  E5y6 = list(cont = "ln_E5y6", lag = "ln_E5y6_lag1")
+)
+
+for (nombre in names(estratos_vars_ll)) {
+  
+  var_cont <- estratos_vars_ll[[nombre]]$cont
+  var_lag  <- estratos_vars_ll[[nombre]]$lag
+  
+  mod_cont <- lm(as.formula(paste("ln_IPC ~", var_cont)), data = datos_est)
+  mod_lag  <- lm(as.formula(paste("ln_IPC ~", var_lag)),  data = datos_est)
+  
+  cat("\n==========================================\n")
+  cat("ESTRATO", nombre, "— LOG-LOG\n")
+  cat("==========================================\n")
+  
+  for (mod_info in list(list(m = mod_cont, nombre = "Contemporaneo",  var = var_cont),
+                        list(m = mod_lag,  nombre = "Rezagado 1 mes", var = var_lag))) {
+    
+    mod <- mod_info$m
+    nom <- mod_info$nombre
+    var <- mod_info$var
+    
+    cat("\n---", nom, "| Coeficientes (HAC) ---\n")
+    print(coeftest(mod, vcov = NeweyWest(mod, lag = 4, prewhite = FALSE)))
+    cat("R2 =", round(summary(mod)$r.squared, 4), "\n")
+    
+    cat("BG Autocorrelacion:\n")
+    print(bgtest(mod, order = 3))
+    
+    cat("BP Heterocedasticidad:\n")
+    print(bptest(mod))
+    
+    cat("Shapiro-Wilk (Normalidad):\n")
+    print(shapiro.test(residuals(mod)))
+    
+    cat("Jarque-Bera (Normalidad):\n")
+    print(jarque.bera.test(residuals(mod)))
+    
+    cat("RESET de Ramsey (Especificacion):\n")
+    print(resettest(mod, power = 2:3, type = "fitted"))
+    
+    cat("Cook's Distance - Obs influyentes (D > 4/n):\n")
+    cook <- cooks.distance(mod)
+    print(which(cook > 4/length(cook)))
+    
+    cat("CUSUM (Estabilidad estructural):\n")
+    formula_cusum <- as.formula(paste("ln_IPC ~", var))
+    cusum_test <- efp(formula_cusum, data = datos_est, type = "OLS-CUSUM")
+    print(sctest(cusum_test))
+  }
+}
+
+
+
+
+
+# ============================================================
 # GRAFICAS
 # ============================================================
 
@@ -637,5 +722,10 @@ g6b <- ggplot(datos_graf %>% filter(!is.na(var_cuv)),
 
 g6 <- g6a / g6b
 print(g6)
+
+
+
+
+
 
 
