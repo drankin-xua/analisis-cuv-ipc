@@ -639,9 +639,3 @@ g6 <- g6a / g6b
 print(g6)
 
 
-# ============================================================
-# EXPORTAR DATOS GRAFICOS
-# ============================================================
-write.csv(datos_graf,
-          "C:/Users/drankin/Documents/Base_limpia_auto_energía/datos_graf.csv",
-          row.names = FALSE)
