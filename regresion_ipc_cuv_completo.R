@@ -1,4 +1,3 @@
-
 # ============================================================
 # REGRESION IPC ELECTRICIDAD ~ COSTO VARIABLE UNITARIO (CUV)
 # Análisis por promedios nacionales y por estratos
@@ -135,6 +134,23 @@ print(setdiff(ipc_clean$fecha_merge, prom_clean$fecha_merge))
 cat("Meses en IPC pero NO en estratos    :\n")
 print(setdiff(ipc_clean$fecha_merge, estratos_clean$fecha_merge))
 
+# --- Cargar el nuevo promedio de estratos calculado en Python ---
+cuv_nacional_est <- read_excel(ruta2, sheet = "PROMEDIOS_MENSUALES", skip = 1)
+
+cuv_nacional_clean <- cuv_nacional_est %>%
+  select(FECHA, CUV_EST_PROM = PROMEDIO_GENERAL) %>%
+  mutate(
+    fecha_merge = parsear_fecha_es(FECHA)
+  ) %>%
+  filter(!is.na(CUV_EST_PROM), !is.na(fecha_merge))
+
+# UNIR a la base de datos principal
+datos <- datos %>%
+  left_join(cuv_nacional_clean %>% select(fecha_merge, CUV_EST_PROM), by = "fecha_merge")
+
+cat("Filas en datos tras incluir CUV_EST_PROM:", nrow(datos), "\n")
+
+
 
 # ============================================================
 # 5. VARIABLES TRANSFORMADAS
@@ -162,6 +178,16 @@ datos_est <- datos_est %>%
     E3_lag1   = lag(ESTRATO_3,   1),
     E4_lag1   = lag(ESTRATO_4,   1),
     E5y6_lag1 = lag(ESTRATO_5y6, 1)
+  )
+
+datos <- datos %>%
+  arrange(fecha_merge) %>%
+  mutate(
+    ln_CUV_EST_PROM      = log(CUV_EST_PROM),
+    ln_CUV_EST_PROM_lag1 = lag(log(CUV_EST_PROM), 1),
+    CUV_EST_PROM_lag1    = lag(CUV_EST_PROM, 1),
+    # Diferencias para análisis de corto plazo si fuera necesario
+    d_ln_CUV_EST_PROM    = c(NA, diff(ln_CUV_EST_PROM))
   )
 
 
@@ -538,8 +564,69 @@ for (nombre in names(estratos_vars_ll)) {
   }
 }
 
+# ============================================================
+# PARTE I.B: MODELOS CUV PROMEDIO ESTRATOS (LOG-LOG Y LOG-LIN)
+# ============================================================
+
+# 1. ESTIMACIÓN DE LOS MODELOS (Primero creamos los objetos)
+# ------------------------------------------------------------
+
+# Modelos Log-Log (Elasticidades)
+mod_est_cont <- lm(ln_IPC ~ ln_CUV_EST_PROM,      data = datos)
+mod_est_lag  <- lm(ln_IPC ~ ln_CUV_EST_PROM_lag1, data = datos)
+
+# Modelos Log-Lin (Semi-elasticidades)
+mod_est_ll_cont <- lm(ln_IPC ~ CUV_EST_PROM,      data = datos)
+mod_est_ll_lag  <- lm(ln_IPC ~ CUV_EST_PROM_lag1, data = datos)
 
 
+# 2. PROCESAMIENTO Y DIAGNÓSTICO EN BLOQUE
+# ------------------------------------------------------------
+cat("\n================================================\n")
+cat("MODELOS NACIONALES: CONTEMPORÁNEOS VS REZAGADOS\n")
+cat("================================================\n")
+
+# Ahora sí los metemos en la lista
+modelos_est_nacional <- list(
+  list(m = mod_est_cont,    nom = "LOG-LOG CONTEMPORÁNEO", form = "ln_IPC ~ ln_CUV_EST_PROM"),
+  list(m = mod_est_lag,     nom = "LOG-LOG REZAGADO (1M)", form = "ln_IPC ~ ln_CUV_EST_PROM_lag1"),
+  list(m = mod_est_ll_cont, nom = "LOG-LIN CONTEMPORÁNEO", form = "ln_IPC ~ CUV_EST_PROM"),
+  list(m = mod_est_ll_lag,  nom = "LOG-LIN REZAGADO (1M)", form = "ln_IPC ~ CUV_EST_PROM_lag1")
+)
+
+for (item in modelos_est_nacional) {
+  m <- item$m
+  
+  cat("\n******************************************\n")
+  cat(item$nom, "\n")
+  cat("******************************************\n")
+  
+  # Coeficientes con Errores HAC (Newey-West)
+  cat("--- Coeficientes (HAC) ---\n")
+  print(coeftest(m, vcov = NeweyWest(m, lag = 4)))
+  
+  # Bondad de ajuste
+  cat("R2:", round(summary(m)$r.squared, 4), "\n")
+  
+  # Bloque resumido de Diagnóstico
+  cat("\n--- Diagnóstico Rápido (p-values) ---\n")
+  
+  # Autocorrelación
+  bg_p <- bgtest(m, order = 3)$p.value
+  cat("BG Autocorrelación: ", round(bg_p, 5), ifelse(bg_p < 0.05, " (Problema)", " (OK)"), "\n")
+  
+  # Heterocedasticidad
+  bp_p <- bptest(m)$p.value
+  cat("BP Heterocedasticidad:", round(bp_p, 5), ifelse(bp_p < 0.05, " (Problema)", " (OK)"), "\n")
+  
+  # Estabilidad (CUSUM)
+  cusum_p <- sctest(efp(as.formula(item$form), data = datos, type = "OLS-CUSUM"))$p.value
+  cat("CUSUM Estabilidad:   ", round(cusum_p, 5), "\n")
+  
+  # Cointegración (ADF Residuos)
+  adf_p <- adf.test(residuals(m))$p.value
+  cat("ADF Cointegración:   ", round(adf_p, 5), ifelse(adf_p < 0.05, " (Cointegrados)", " (No cointegrados)"), "\n")
+}
 
 
 # ============================================================
@@ -726,6 +813,9 @@ print(g6)
 
 
 
-
-
-
+# ============================================================
+# EXPORTAR DATOS GRAFICOS
+# ============================================================
+write.csv(datos_graf,
+          "C:/Users/drankin/Documents/Base_limpia_auto_energía/datos_graf.csv",
+          row.names = FALSE)
