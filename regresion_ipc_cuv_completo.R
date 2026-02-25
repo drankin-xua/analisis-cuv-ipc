@@ -1,12 +1,12 @@
-# ============================================================
+
 # REGRESION IPC ELECTRICIDAD ~ COSTO VARIABLE UNITARIO (CUV)
 # Análisis por promedios nacionales y por estratos
-# ============================================================
 
 
-# ============================================================
+
+
 # 1. INSTALACION Y CARGA DE LIBRERIAS
-# ============================================================
+
 install.packages("readxl")
 install.packages("dplyr")
 install.packages("lubridate")
@@ -35,16 +35,15 @@ library(scales)
 library(patchwork)
 library(stringr)
 
-# ============================================================
 # 2. RUTAS DE ARCHIVOS
-# ============================================================
+
 ruta1 <- "C:/Users/drankin/Documents/Base_limpia_auto_energía/BASE_TARIFAS_ENERGIA_CON_ANTIGUOS.xlsx"
 ruta2 <- "C:/Users/drankin/Documents/Base_limpia_auto_energía/BASE_TARIFAS_ESTRATOS.xlsx"
 
 
-# ============================================================
+
 # 3. CARGA Y LIMPIEZA DE DATOS
-# ============================================================
+
 
 parsear_fecha_es <- function(x) {
   meses_es <- c(
@@ -113,9 +112,9 @@ estratos_clean <- estratos %>%
 cat("Filas en estratos_clean:", nrow(estratos_clean), "\n")
 
 
-# ============================================================
+
 # 4. MERGE DE BASES
-# ============================================================
+
 datos <- inner_join(ipc_clean, prom_clean, by = "fecha_merge")
 cat("Filas merge promedios:", nrow(datos), "\n")
 
@@ -152,9 +151,9 @@ cat("Filas en datos tras incluir CUV_EST_PROM:", nrow(datos), "\n")
 
 
 
-# ============================================================
+
 # 5. VARIABLES TRANSFORMADAS
-# ============================================================
+
 
 # Promedios nacionales
 datos <- datos %>%
@@ -191,13 +190,13 @@ datos <- datos %>%
   )
 
 
-# ============================================================
-# PARTE I: ANALISIS CON PROMEDIOS NACIONALES
-# ============================================================
 
-# ------------------------------------------------------------
+# PARTE I: ANALISIS CON PROMEDIOS NACIONALES
+
+
+
 # 6. TEST ADF - ESTACIONARIEDAD
-# ------------------------------------------------------------
+
 cat("\n========================================\n")
 cat("TEST ADF - ESTACIONARIEDAD\n")
 cat("========================================\n")
@@ -212,9 +211,9 @@ cat("\n--- ADF: ln(CUV) ---\n")
 print(adf.test(cuv_ts))
 
 
-# ------------------------------------------------------------
+
 # 7. TEST DE JOHANSEN - COINTEGRACION
-# ------------------------------------------------------------
+
 cat("\n========================================\n")
 cat("TEST DE JOHANSEN - COINTEGRACION\n")
 cat("========================================\n")
@@ -225,9 +224,9 @@ johansen_test <- ca.jo(datos_coint, type = "trace", ecdet = "const", K = 2)
 summary(johansen_test)
 
 
-# ------------------------------------------------------------
+
 # 8. MODELOS PROMEDIOS NACIONALES
-# ------------------------------------------------------------
+
 cat("\n========================================\n")
 cat("MODELOS - PROMEDIOS NACIONALES\n")
 cat("========================================\n")
@@ -256,9 +255,9 @@ cat("Modelo 3 - Log-Log:          R2 =", round(summary(modelo_loglog)$r.squared,
 cat("Modelo 4 - Log-Log Lag1:     R2 =", round(summary(modelo_loglog_lag)$r.squared, 4), "\n")
 
 
-# ------------------------------------------------------------
+
 # 9. DIAGNOSTICO COMPLETO - MODELOS NACIONALES
-# ------------------------------------------------------------
+
 cat("\n========================================\n")
 cat("DIAGNOSTICO COMPLETO - MODELOS NACIONALES\n")
 cat("========================================\n")
@@ -310,9 +309,9 @@ par(mfrow = c(2, 2))
 plot(modelo_loglog, main = "Diagnostico Modelo Log-Log")
 
 
-# ------------------------------------------------------------
+
 # 10. ECM - ERROR CORRECTION MODEL
-# ------------------------------------------------------------
+
 cat("\n========================================\n")
 cat("ECM - ERROR CORRECTION MODEL\n")
 cat("========================================\n")
@@ -345,9 +344,9 @@ cat("Shapiro-Wilk (Normalidad):\n")
 print(shapiro.test(residuals(ecm)))
 
 
-# ============================================================
+
 # PARTE II: ANALISIS POR ESTRATOS (AGRUPADOS)
-# ============================================================
+
 cat("\n========================================\n")
 cat("MODELOS - POR ESTRATOS (todas las variables)\n")
 cat("ADVERTENCIA: Alta multicolinealidad esperada\n")
@@ -366,9 +365,9 @@ print(coeftest(modelo_B, vcov = vcovHAC(modelo_B)))
 cat("R2 =", round(summary(modelo_B)$r.squared, 4), "\n")
 
 
-# ------------------------------------------------------------
+
 # DIAGNOSTICO COMPLETO - MODELOS A Y B
-# ------------------------------------------------------------
+
 cat("\n========================================\n")
 cat("DIAGNOSTICO COMPLETO - MODELOS A Y B\n")
 cat("========================================\n")
@@ -419,9 +418,9 @@ par(mfrow = c(2, 2))
 plot(modelo_A, main = "Diagnostico Modelo A - Contemporaneo")
 
 
-# ============================================================
+
 # PARTE III: REGRESIONES INDIVIDUALES POR ESTRATO
-# ============================================================
+
 cat("\n========================================\n")
 cat("REGRESIONES INDIVIDUALES POR ESTRATO\n")
 cat("========================================\n")
@@ -484,9 +483,9 @@ for (nombre in names(estratos_vars)) {
 }
 
 
-# ============================================================
+
 # PARTE IV: REGRESIONES INDIVIDUALES POR ESTRATO — LOG-LOG
-# ============================================================
+
 cat("\n========================================\n")
 cat("REGRESIONES INDIVIDUALES POR ESTRATO — LOG-LOG\n")
 cat("Interpretación: coeficiente = elasticidad (% cambio IPC / % cambio CUV)\n")
@@ -564,9 +563,9 @@ for (nombre in names(estratos_vars_ll)) {
   }
 }
 
-# ============================================================
+
 # PARTE I.B: MODELOS CUV PROMEDIO ESTRATOS (LOG-LOG Y LOG-LIN)
-# ============================================================
+
 
 # 1. ESTIMACIÓN DE LOS MODELOS (Primero creamos los objetos)
 # ------------------------------------------------------------
@@ -629,9 +628,9 @@ for (item in modelos_est_nacional) {
 }
 
 
-# ============================================================
+
 # GRAFICAS
-# ============================================================
+
 
 # Preparar datos con fecha real
 datos_graf <- datos %>%
@@ -645,9 +644,9 @@ datos_graf <- datos %>%
 color_ipc <- "#1a6faf"
 color_cuv <- "#c0392b"
 
-# ============================================================
+
 # GRAFICA 1: Serie IPC de Electricidad (niveles)
-# ============================================================
+
 g1 <- ggplot(datos_graf, aes(x = fecha, y = IPC)) +
   geom_line(color = color_ipc, linewidth = 1) +
   geom_point(color = color_ipc, size = 1.5) +
@@ -667,9 +666,9 @@ g1 <- ggplot(datos_graf, aes(x = fecha, y = IPC)) +
 
 print(g1)
 
-# ============================================================
+
 # GRAFICA 2: Serie CUV Promedio Nacional (niveles)
-# ============================================================
+
 g2 <- ggplot(datos_graf, aes(x = fecha, y = CUV)) +
   geom_line(color = color_cuv, linewidth = 1) +
   geom_point(color = color_cuv, size = 1.5) +
@@ -689,9 +688,9 @@ g2 <- ggplot(datos_graf, aes(x = fecha, y = CUV)) +
 
 print(g2)
 
-# ============================================================
+
 # GRAFICA 3: Variacion porcentual mensual IPC
-# ============================================================
+
 g3 <- ggplot(datos_graf %>% filter(!is.na(var_ipc)),
              aes(x = fecha, y = var_ipc)) +
   geom_col(aes(fill = var_ipc > 0), show.legend = FALSE) +
@@ -711,9 +710,9 @@ g3 <- ggplot(datos_graf %>% filter(!is.na(var_ipc)),
 
 print(g3)
 
-# ============================================================
+
 # GRAFICA 4: Variacion porcentual mensual CUV
-# ============================================================
+
 g4 <- ggplot(datos_graf %>% filter(!is.na(var_cuv)),
              aes(x = fecha, y = var_cuv)) +
   geom_col(aes(fill = var_cuv > 0), show.legend = FALSE) +
@@ -733,9 +732,9 @@ g4 <- ggplot(datos_graf %>% filter(!is.na(var_cuv)),
 
 print(g4)
 
-# ============================================================
+
 # GRAFICA 5: IPC y CUV en niveles (doble eje)
-# ============================================================
+
 escala_factor <- max(datos_graf$IPC, na.rm = TRUE) / max(datos_graf$CUV, na.rm = TRUE)
 
 tema_academico <- theme_classic(base_size = 12) +
@@ -777,9 +776,9 @@ g5 <- ggplot(datos_graf, aes(x = fecha)) +
 
 print(g5)
 
-# ============================================================
+
 # GRAFICA 6: Variacion porcentual (panel doble apilado)
-# ============================================================
+
 g6a <- ggplot(datos_graf %>% filter(!is.na(var_ipc)),
               aes(x = fecha, y = var_ipc)) +
   geom_col(aes(fill = var_ipc >= 0), width = 25, show.legend = FALSE) +
@@ -813,9 +812,5 @@ print(g6)
 
 
 
-# ============================================================
-# EXPORTAR DATOS GRAFICOS
-# ============================================================
-write.csv(datos_graf,
-          "C:/Users/drankin/Documents/Base_limpia_auto_energía/datos_graf.csv",
-          row.names = FALSE)
+
+
